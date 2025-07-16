@@ -10,3 +10,7 @@ wheels/
 .venv
 
 .env
+
+functions/config.py
+
+calculator/lorem.txt
