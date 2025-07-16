@@ -17,7 +17,7 @@ def main():
     args = []
     for arg in sys.argv[1:]:
         if not arg.startswith("--"):
-            args.append[arg]
+            args.append(arg)
 
     if len(sys.argv) == 1:
         print("ERROR: No prompt given")
