@@ -5,9 +5,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from system_prompt import system_prompt
-from functions.get_files_info import schema_get_files_info, available_functions
-
-
+from call_function import available_functions, function_dictionary
 
 def main():
     load_dotenv()
@@ -31,7 +29,10 @@ def main():
         types.Content(role="user", parts=[types.Part(text=question)]),
     ]
 
+    verbose_status=False
+
     if sys.argv[-1] == "--verbose":
+        verbose_status = True
         print(f"\nUser prompt: \n{question}")
     print("\nRESPONSE:")
 
@@ -41,14 +42,50 @@ def main():
 
     if response.function_calls:
         for function_call in response.function_calls:
-            print(f"Calling function: {function_call.name}({function_call.args})")
+            function_call_result = call_function(function_call, verbose_status)
+            if not function_call_result.parts[0].function_response.response:
+                raise Exception("ERROR: No response generated. Check code.")
+            if verbose_status == True:
+                print(f"-> {function_call_result.parts[0].function_response.response}")
+
+
     else:    
         print(response.text)
 
-    if sys.argv[-1] == "--verbose":
+    if verbose_status:
         print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
         print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
 
+#
+
+def call_function(function_call_part, verbose=False):
+    if verbose == True:
+        print(f"Calling function: {function_call_part.name}({function_call_part.args})")
+    else: 
+        print(f" - Calling function: {function_call_part.name}")
+    function_call_part.args["working_directory"] = "./calculator"
+    if function_call_part.name not in function_dictionary:
+        return types.Content(
+            role="tool",
+            parts=[
+                types.Part.from_function_response(
+                    name=function_call_part.name,
+                    response={"error": f"Unknown function: {function_call_part.name}"},
+        )
+    ],
+)
+    function_result = function_dictionary[function_call_part.name](**function_call_part.args)
+    return types.Content(
+        role="tool",
+        parts=[
+            types.Part.from_function_response(
+                name=function_call_part.name,
+                response={"result": function_result},
+        )
+    ],
+)
+    
+#
 
 if __name__ == "__main__":
     main()
