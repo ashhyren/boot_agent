@@ -4,6 +4,8 @@ import sys
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from system_prompt import system_prompt
+from functions.get_files_info import schema_get_files_info, available_functions
 
 
 
@@ -34,9 +36,15 @@ def main():
     print("\nRESPONSE:")
 
     response = client.models.generate_content(
-        model='gemini-2.0-flash-001', contents=messages
+        model='gemini-2.0-flash-001', contents=messages, config=types.GenerateContentConfig(tools=[available_functions],system_instruction=system_prompt)
     )
-    print(response.text)
+
+    if response.function_calls:
+        for function_call in response.function_calls:
+            print(f"Calling function: {function_call.name}({function_call.args})")
+    else:    
+        print(response.text)
+
     if sys.argv[-1] == "--verbose":
         print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
         print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
