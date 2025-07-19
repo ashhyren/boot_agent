@@ -36,22 +36,33 @@ def main():
         print(f"\nUser prompt: \n{question}")
     print("\nRESPONSE:")
 
-    response = client.models.generate_content(
-        model='gemini-2.0-flash-001', contents=messages, config=types.GenerateContentConfig(tools=[available_functions],system_instruction=system_prompt)
-    )
+    iteration = 0
 
-    if response.function_calls:
-        for function_call in response.function_calls:
-            function_call_result = call_function(function_call, verbose_status)
-            if not function_call_result.parts[0].function_response.response:
-                raise Exception("ERROR: No response generated. Check code.")
-            if verbose_status == True:
-                print(f"-> {function_call_result.parts[0].function_response.response}")
+    while iteration <= 20:
+        try:
+            response = client.models.generate_content(
+            model='gemini-2.0-flash-001', contents=messages, config=types.GenerateContentConfig(tools=[available_functions],system_instruction=system_prompt)
+            )
+            iteration += 1
+            for candidate in response.candidates:
+                messages.append(candidate.content)
+            if response.function_calls:
+                for function_call in response.function_calls:
+                    function_call_result = call_function(function_call, verbose_status)
+                    if not function_call_result.parts[0].function_response.response:
+                        raise Exception("ERROR: No response generated. Check code.")
+                    if verbose_status == True:
+                        print(f"-> {function_call_result.parts[0].function_response.response}")
+                    messages.append(function_call_result)
+            elif response.text:
+                print(response.text)
+                return
+        except Exception as e:
+            print(f"ERROR {e}: Issue generating content. Please review generate content code.")
 
-
-    else:    
-        print(response.text)
-
+    if iteration > 20:
+        print("Error: Reached iteration limit without completing task.")
+    
     if verbose_status:
         print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
         print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
@@ -71,9 +82,9 @@ def call_function(function_call_part, verbose=False):
                 types.Part.from_function_response(
                     name=function_call_part.name,
                     response={"error": f"Unknown function: {function_call_part.name}"},
+                )
+            ],
         )
-    ],
-)
     function_result = function_dictionary[function_call_part.name](**function_call_part.args)
     return types.Content(
         role="tool",
